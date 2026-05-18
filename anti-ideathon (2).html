@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anti-Ideathon Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --border: #2a2a38;
+    --border-bright: #3d3d55;
+    --text: #e8e8f0;
+    --text-muted: #7a7a9a;
+    --text-dim: #3a3a52;
+    --accent: #ff3f3f;
+    --accent2: #ff8c42;
+    --accent3: #7b61ff;
+    --green: #3ddc84;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans Thai', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* SCANLINE EFFECT */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ═══ SIDEBAR ═══ */
+  .sidebar {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar-header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: .15em;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .logo-tag::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .logo-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .logo-title span { color: var(--accent); }
+  .logo-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  /* STATUS BAR */
+  .status-bar {
+    margin: 16px 24px 0;
+    padding: 10px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.err { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.checking { background: var(--accent2); animation: pulse 1s infinite; }
+  #status-text { color: var(--text-muted); flex: 1; }
+
+  /* FORM SECTIONS */
+  .sidebar-body { padding: 20px 24px; flex: 1; }
+  .field-group { margin-bottom: 22px; }
+  .field-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .field-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  textarea, input[type=range] {
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 13px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    transition: border-color .2s;
+    outline: none;
+  }
+  textarea {
+    padding: 10px 12px;
+    resize: none;
+    min-height: 110px;
+    line-height: 1.6;
+  }
+  textarea::placeholder { color: var(--text-dim); }
+  textarea:focus { border-color: var(--accent3); }
+
+  /* FRAMEWORK CATEGORY LABEL */
+  .fw-category {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent3);
+    letter-spacing: .08em;
+    margin: 10px 0 6px;
+  }
+  .fw-category:first-child { margin-top: 0; }
+
+  /* FRAMEWORK CHECKBOXES */
+  .fw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .fw-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    font-size: 12px;
+    color: var(--text-muted);
+    user-select: none;
+  }
+  .fw-item:hover { border-color: var(--border-bright); color: var(--text); }
+  .fw-item.selected {
+    border-color: var(--accent3);
+    background: rgba(123,97,255,.08);
+    color: var(--text);
+  }
+  .fw-item input { display: none; }
+  .fw-check {
+    width: 14px; height: 14px;
+    border: 1px solid var(--border-bright);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    flex-shrink: 0;
+    transition: background .15s, border-color .15s;
+  }
+  .fw-item.selected .fw-check {
+    background: var(--accent3);
+    border-color: var(--accent3);
+    color: #fff;
+  }
+
+  /* ROLE BUTTONS */
+  .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .role-btn {
+    padding: 10px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .2s, background .2s;
+    color: var(--text-muted);
+    font-family: var(--sans);
+  }
+  .role-btn:hover { border-color: var(--border-bright); color: var(--text); }
+  .role-btn.active { border-color: var(--accent); background: rgba(255,63,63,.06); color: var(--text); }
+  .role-emoji { font-size: 18px; display: block; margin-bottom: 3px; }
+  .role-name { font-size: 12px; font-weight: 500; display: block; }
+  .role-sub { font-size: 10px; color: var(--text-muted); font-family: var(--mono); display: block; margin-top: 1px; }
+
+  /* INTENSITY */
+  .intensity-wrap { padding: 4px 0; }
+  input[type=range] {
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--border);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    margin: 6px 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(255,63,63,.5);
+    cursor: pointer;
+  }
+  .intensity-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  #intensity-val {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent2);
+    margin-top: 4px;
+  }
+
+  /* SUBMIT */
+  .sidebar-footer { padding: 16px 24px 24px; border-top: 1px solid var(--border); }
+  .submit-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: .05em;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .submit-btn:hover { opacity: .88; }
+  .submit-btn:active { transform: scale(.98); }
+  .submit-btn:disabled { opacity: .35; cursor: default; }
+  .submit-btn .btn-icon { font-size: 16px; }
+
+  /* MODEL SELECTOR */
+  .model-select {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+  }
+  .model-select:focus { border-color: var(--accent3); }
+
+  /* ═══ MAIN PANEL ═══ */
+  .main-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+  .main-header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .main-header-left {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .session-id {
+    color: var(--accent3);
+    letter-spacing: .05em;
+  }
+  .clear-btn {
+    padding: 6px 14px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+  }
+  .clear-btn:hover { border-color: var(--border-bright); color: var(--text); }
+
+  /* EMPTY STATE */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 13px;
+    gap: 12px;
+    padding: 40px;
+  }
+  .empty-ascii {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-dim);
+    text-align: center;
+    opacity: .5;
+  }
+
+  /* OUTPUT AREA */
+  .output-area {
+    flex: 1;
+    padding: 32px;
+    overflow-y: auto;
+    display: none;
+  }
+  .output-area.visible { display: block; }
+
+  /* ANALYSIS BLOCK */
+  .analysis-block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .block-header {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg3);
+  }
+  .block-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    flex: 1;
+  }
+  .role-tag-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    border: 1px solid;
+  }
+  .role-tag-badge.shark { border-color: var(--accent); color: var(--accent); }
+  .role-tag-badge.vc { border-color: var(--accent3); color: var(--accent3); }
+  .role-tag-badge.rival { border-color: var(--accent2); color: var(--accent2); }
+  .role-tag-badge.customer { border-color: var(--green); color: var(--green); }
+
+  .block-content {
+    padding: 20px 22px;
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: var(--sans);
+  }
+  .block-content h2, .block-content h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 18px 0 8px;
+    color: var(--accent);
+    font-family: var(--mono);
+    letter-spacing: .08em;
+  }
+  .block-content h2:first-child, .block-content h3:first-child { margin-top: 0; }
+
+  /* TYPING CURSOR */
+  .cursor {
+    display: inline-block;
+    width: 8px; height: 15px;
+    background: var(--accent);
+    vertical-align: text-bottom;
+    animation: blink .7s infinite;
+    margin-left: 2px;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* FRAMEWORK TAGS */
+  .fw-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 12px;
+  }
+  .fw-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border: 1px solid var(--border-bright);
+    border-radius: 3px;
+    color: var(--text-muted);
+  }
+
+  /* HISTORY */
+  .history-list { display: flex; flex-direction: column; gap: 16px; }
+
+  /* OLLAMA SETUP NOTICE */
+  .setup-notice {
+    margin: 12px 24px 0;
+    padding: 10px 12px;
+    background: rgba(255,140,66,.06);
+    border: 1px solid rgba(255,140,66,.25);
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--accent2);
+    font-family: var(--mono);
+    line-height: 1.6;
+    display: none;
+  }
+  .setup-notice a { color: var(--accent2); }
+  .setup-notice.visible { display: block; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: relative; height: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-tag">SYSTEM ONLINE</div>
+      <div class="logo-title"><span>Anti</span>-Ideathon</div>
+      <div class="logo-sub">Strategy Validation Simulator v2.0</div>
+    </div>
+
+    <!-- Ollama Status -->
+    <div class="status-bar">
+      <div class="status-dot checking" id="status-dot"></div>
+      <span id="status-text">กำลังตรวจสอบ Ollama...</span>
+    </div>
+    <div class="setup-notice" id="setup-notice">
+      ⚠ Ollama ไม่ตอบสนอง<br>
+      1. ดาวน์โหลด: <a href="https://ollama.com" target="_blank">ollama.com</a><br>
+      2. รัน: <code>ollama pull llama3.2</code><br>
+      3. ตรวจสอบ: <code>ollama serve</code>
+    </div>
+
+    <div class="sidebar-body">
+
+      <!-- MODEL -->
+      <div class="field-group">
+        <div class="field-label">Model</div>
+        <select class="model-select" id="model-select">
+          <option value="llama3.2:1b">llama3.2:1b (แนะนำ — เบา)</option>
+          <option value="llama3.2">llama3.2</option>
+          <option value="llama3.1">llama3.1</option>
+          <option value="gemma3:1b">gemma3:1b</option>
+          <option value="gemma3">gemma3</option>
+          <option value="mistral">mistral</option>
+          <option value="qwen2.5">qwen2.5</option>
+          <option value="typhoon2">typhoon2 (ไทย)</option>
+        </select>
+      </div>
+
+      <!-- IDEA INPUT -->
+      <div class="field-group">
+        <div class="field-label">ไอเดียธุรกิจ</div>
+        <textarea id="idea-input" placeholder="อธิบายไอเดีย: ขายอะไร กลุ่มเป้าหมายคือใคร รายได้มาจากไหน ทำไมถึงดีกว่าคนอื่น..."></textarea>
+      </div>
+
+      <!-- FRAMEWORKS -->
+      <div class="field-group">
+        <div class="field-label">Attack Framework</div>
+
+        <div class="fw-category">📊 Market Analysis</div>
+        <div class="fw-grid">
+          <label class="fw-item selected" onclick="toggleFW(this)">
+            <input type="checkbox" value="pestel" checked>
+            <span class="fw-check">✓</span>
+            <span>PESTEL</span>
+          </label>
+          <label class="fw-item selected" onclick="toggleFW(this)">
+            <input type="checkbox" value="porter" checked>
+            <span class="fw-check">✓</span>
+            <span>Porter's 5</span>
+          </label>
+          <label class="fw-item selected" onclick="toggleFW(this)">
+            <input type="checkbox" value="tam" checked>
+            <span class="fw-check">✓</span>
+            <span>TAM/SAM/SOM</span>
+          </label>
+        </div>
+
+        <div class="fw-category">🎯 Strategy & Positioning</div>
+        <div class="fw-grid">
+          <label class="fw-item" onclick="toggleFW(this)">
+            <input type="checkbox" value="stp">
+            <span class="fw-check"></span>
+            <span>STP</span>
+          </label>
+          <label class="fw-item" onclick="toggleFW(this)">
+            <input type="checkbox" value="vpc">
+            <span class="fw-check"></span>
+            <span>Value Prop Canvas</span>
+          </label>
+          <label class="fw-item" onclick="toggleFW(this)">
+            <input type="checkbox" value="blueocean">
+            <span class="fw-check"></span>
+            <span>Blue Ocean</span>
+          </label>
+        </div>
+
+        <div class="fw-category">⚙️ Execution & Funnel</div>
+        <div class="fw-grid">
+          <label class="fw-item" onclick="toggleFW(this)">
+            <input type="checkbox" value="4ps">
+            <span class="fw-check"></span>
+            <span>4Ps Marketing</span>
+          </label>
+          <label class="fw-item" onclick="toggleFW(this)">
+            <input type="checkbox" value="aida">
+            <span class="fw-check"></span>
+            <span>AIDA Funnel</span>
+          </label>
+          <label class="fw-item" onclick="toggleFW(this)">
+            <input type="checkbox" value="unit">
+            <span class="fw-check"></span>
+            <span>Unit Economics</span>
+          </label>
+        </div>
+
+        <div class="fw-category">🧠 Logic & Thinking</div>
+        <div class="fw-grid">
+          <label class="fw-item selected" onclick="toggleFW(this)">
+            <input type="checkbox" value="toulmin" checked>
+            <span class="fw-check">✓</span>
+            <span>Toulmin Logic</span>
+          </label>
+          <label class="fw-item" onclick="toggleFW(this)">
+            <input type="checkbox" value="jtbd">
+            <span class="fw-check"></span>
+            <span>Jobs-to-be-Done</span>
+          </label>
+          <label class="fw-item" onclick="toggleFW(this)">
+            <input type="checkbox" value="firstprinciples">
+            <span class="fw-check"></span>
+            <span>First Principles</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ROLE -->
+      <div class="field-group">
+        <div class="field-label">บทบาท AI</div>
+        <div class="role-grid">
+          <button class="role-btn active" data-role="shark" onclick="selectRole(this)">
+            <span class="role-emoji">⚔️</span>
+            <span class="role-name">Shark Tank</span>
+            <span class="role-sub">โหด ตรง ไม่ปลอบ</span>
+          </button>
+          <button class="role-btn" data-role="vc" onclick="selectRole(this)">
+            <span class="role-emoji">📊</span>
+            <span class="role-name">VC ขี้สงสัย</span>
+            <span class="role-sub">unit econ heavy</span>
+          </button>
+          <button class="role-btn" data-role="rival" onclick="selectRole(this)">
+            <span class="role-emoji">🏭</span>
+            <span class="role-name">คู่แข่งตลาด</span>
+            <span class="role-sub">วางกลยุทธ์สู้</span>
+          </button>
+          <button class="role-btn" data-role="customer" onclick="selectRole(this)">
+            <span class="role-emoji">😤</span>
+            <span class="role-name">ลูกค้าขี้บ่น</span>
+            <span class="role-sub">ทำไมต้องซื้อ?</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- INTENSITY -->
+      <div class="field-group">
+        <div class="field-label">ความโหด</div>
+        <div class="intensity-wrap">
+          <input type="range" id="intensity" min="1" max="3" step="1" value="2">
+          <div class="intensity-labels">
+            <span>พอประมาณ</span>
+            <span>สุดโหด</span>
+          </div>
+          <div id="intensity-val">🔥🔥 โหดพอประมาณ — พูดตรง ไม่ปลอบ</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="submit-btn" id="submit-btn" onclick="runAnalysis()">
+        <span class="btn-icon">⚡</span>
+        <span id="btn-text">ส่งไอเดียให้โจมตี</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN PANEL ═══ -->
+  <main class="main-panel">
+    <div class="main-header">
+      <div class="main-header-left">
+        <span>SESSION</span>
+        <span class="session-id" id="session-id">—</span>
+      </div>
+      <button class="clear-btn" onclick="clearHistory()">ล้างประวัติ</button>
+    </div>
+
+    <!-- EMPTY STATE -->
+    <div class="empty-state" id="empty-state">
+      <pre class="empty-ascii">
+  ╔══════════════════════════╗
+  ║  กรอกไอเดียทางซ้าย      ║
+  ║  แล้วกด ⚡ ส่งโจมตี     ║
+  ║                          ║
+  ║  "พังก่อน เสียใจทีหลัง" ║
+  ╚══════════════════════════╝</pre>
+      <div>รอรับการวิเคราะห์...</div>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="output-area" id="output-area">
+      <div class="history-list" id="history-list"></div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+// ═══ STATE ═══
+let sessionId = Math.random().toString(36).slice(2,8).toUpperCase();
+let isRunning = false;
+let ollamaOk = false;
+
+document.getElementById('session-id').textContent = sessionId;
+
+// ═══ INTENSITY LABELS ═══
+const intensityLabels = [
+  '🔥 สร้างสรรค์ — ชี้จุดอ่อนอย่างสุภาพ',
+  '🔥🔥 โหดพอประมาณ — พูดตรง ไม่ปลอบ',
+  '🔥🔥🔥 สุดโหด — ไม่ไว้หน้า ทำลายทุกจุด'
+];
+document.getElementById('intensity').addEventListener('input', function() {
+  document.getElementById('intensity-val').textContent = intensityLabels[this.value - 1];
+});
+
+// ═══ FRAMEWORK TOGGLE ═══
+function toggleFW(label) {
+  const cb = label.querySelector('input');
+  const check = label.querySelector('.fw-check');
+  setTimeout(() => {
+    if (cb.checked) {
+      label.classList.add('selected');
+      check.textContent = '✓';
+    } else {
+      label.classList.remove('selected');
+      check.textContent = '';
+    }
+  }, 0);
+}
+
+// ═══ ROLE SELECT ═══
+function selectRole(btn) {
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ═══ CLEAR ═══
+function clearHistory() {
+  document.getElementById('history-list').innerHTML = '';
+  document.getElementById('output-area').classList.remove('visible');
+  document.getElementById('empty-state').style.display = '';
+  sessionId = Math.random().toString(36).slice(2,8).toUpperCase();
+  document.getElementById('session-id').textContent = sessionId;
+}
+
+// ═══ CHECK OLLAMA ═══
+async function checkOllama() {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  const notice = document.getElementById('setup-notice');
+  try {
+    const r = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const data = await r.json();
+      const models = data.models?.map(m => m.name) || [];
+      dot.className = 'status-dot ok';
+      txt.textContent = models.length ? `Ollama OK — ${models.length} model(s)` : 'Ollama OK — ยังไม่มี model';
+      notice.classList.remove('visible');
+      ollamaOk = true;
+      // auto-populate model select
+      if (models.length) {
+        const sel = document.getElementById('model-select');
+        const existing = [...sel.options].map(o => o.value);
+        models.forEach(m => {
+          const base = m.split(':')[0];
+          if (!existing.includes(base)) {
+            const opt = document.createElement('option');
+            opt.value = m; opt.textContent = m;
+            sel.appendChild(opt);
+          }
+        });
+      }
+    } else { throw new Error(); }
+  } catch {
+    dot.className = 'status-dot err';
+    txt.textContent = 'Ollama ไม่ตอบสนอง';
+    notice.classList.add('visible');
+    ollamaOk = false;
+  }
+}
+checkOllama();
+setInterval(checkOllama, 15000);
+
+// ═══ BUILD PROMPT ═══
+function buildPrompt(idea, frameworks, role, intensity) {
+  const roleMap = {
+    shark: 'กรรมการ Shark Tank ผู้มีประสบการณ์หลายสิบปี สุดโหด พูดตรง ไม่ถนอมน้ำใจ มองหาจุดอ่อนก่อนเสมอ',
+    vc: 'Venture Capitalist ที่เน้น unit economics และ scalability ตั้งคำถามทุกตัวเลข ต้องการ evidence ไม่ใช่ความฝัน',
+    rival: 'คู่แข่งในตลาดที่มีทรัพยากรและประสบการณ์มากกว่า วิเคราะห์ว่าจะตอบโต้และทำลายไอเดียนี้ได้อย่างไร',
+    customer: 'ลูกค้าที่มีตัวเลือกเยอะและขี้สงสัย ตั้งคำถามว่าทำไมถึงต้องเปลี่ยนมาใช้สินค้าหรือบริการนี้'
+  };
+  const fwMap = {
+    pestel: 'PESTEL (การเมือง เศรษฐกิจ สังคม เทคโนโลยี สิ่งแวดล้อม กฎหมาย)',
+    porter: "Porter's 5 Forces (คู่แข่ง ผู้ซื้อ ผู้ขาย สินค้าทดแทน ผู้เข้าใหม่)",
+    tam: 'TAM/SAM/SOM (ขนาดตลาดสมจริงไหม เข้าถึงได้จริงไหม)',
+    stp: 'STP (Segmentation-Targeting-Positioning: กลุ่มเป้าหมายชัดและโดดเด่นไหม)',
+    vpc: 'Value Proposition Canvas (ตรงกับ Customer Pains/Gains จริงไหม)',
+    blueocean: 'Blue Ocean (สร้างตลาดใหม่จริงหรือแค่ Red Ocean เดิม)',
+    '4ps': '4Ps (Product, Price, Place, Promotion — execution สมจริงไหม)',
+    aida: 'AIDA (Attention→Interest→Desire→Action: ลูกค้าจะหลุดตรงไหน)',
+    unit: 'Unit Economics (CAC, LTV, Margin, Payback — ตัวเลขสมจริงไหม)',
+    toulmin: 'Toulmin Logic (Claim มีหลักฐานรองรับไหม มี Rebuttal อะไรบ้าง)',
+    jtbd: 'Jobs-to-be-Done (ลูกค้าจ้างสินค้านี้ทำ "งาน" อะไร มีตัวเลือกอื่นไหม)',
+    firstprinciples: 'First Principles (สมมติฐานตั้งอยู่บนความจริงหรือแค่เลียนแบบคนอื่น)'
+  };
+  const intensityInstr = [
+    'ชี้จุดอ่อนพร้อมคำแนะนำ',
+    'โหดตรง ไม่ปลอบใจ',
+    'สุดโหด ไม่ไว้หน้า ทำลายทุกจุด'
+  ];
+
+  const fwList = frameworks.map(f => fwMap[f]).filter(Boolean).join(', ');
+
+  return `คุณคือ${roleMap[role]} ระดับ: ${intensityInstr[intensity - 1]}
+
+ไอเดีย: "${idea.slice(0, 400)}"
+
+วิเคราะห์ด้วย: ${fwList}
+
+ตอบภาษาไทย รูปแบบ:
+## 🎯 คำตัดสินเบื้องต้น
+(2 ประโยค)
+
+## 💥 จุดอ่อนหลัก
+(3-4 จุด แต่ละจุดมีหัวข้อ วิเคราะห์ตาม framework)
+
+## 🔍 คำถามที่ต้องตอบ
+(3 คำถามสำคัญ)
+
+## ✅ สิ่งที่พอกู้ได้
+(สั้นๆ ตรงๆ)`;
+}
+
+// ═══ RUN ANALYSIS ═══
+async function runAnalysis() {
+  if (isRunning) return;
+
+  const idea = document.getElementById('idea-input').value.trim();
+  if (!idea) {
+    document.getElementById('idea-input').focus();
+    document.getElementById('idea-input').style.borderColor = 'var(--accent)';
+    setTimeout(() => document.getElementById('idea-input').style.borderColor = '', 1500);
+    return;
+  }
+
+  if (!ollamaOk) {
+    alert('Ollama ยังไม่พร้อม กรุณาติดตั้งและเปิด Ollama ก่อน');
+    return;
+  }
+
+  const frameworks = [...document.querySelectorAll('.fw-item.selected input')].map(i => i.value);
+  const role = document.querySelector('.role-btn.active')?.dataset.role || 'shark';
+  const intensity = parseInt(document.getElementById('intensity').value);
+  const model = document.getElementById('model-select').value;
+
+  isRunning = true;
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('btn-text').textContent = 'กำลังวิเคราะห์...';
+
+  // Show output area
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('output-area').classList.add('visible');
+
+  // Create block
+  const block = document.createElement('div');
+  block.className = 'analysis-block';
+  const roleColors = { shark:'shark', vc:'vc', rival:'rival', customer:'customer' };
+  const roleLabels = { shark:'SHARK TANK', vc:'VC MODE', rival:'COMPETITOR', customer:'CUSTOMER' };
+  const ts = new Date().toLocaleTimeString('th-TH');
+  block.innerHTML = `
+    <div class="block-header">
+      <div class="block-meta">
+        <div>${ts} · model: ${model}</div>
+        <div class="fw-tags" style="margin-top:5px">
+          ${frameworks.map(f => `<span class="fw-tag">${f.toUpperCase()}</span>`).join('')}
+        </div>
+      </div>
+      <span class="role-tag-badge ${roleColors[role]}">${roleLabels[role]}</span>
+    </div>
+    <div class="block-content" id="content-${Date.now()}">กำลังวิเคราะห์<span class="cursor"></span></div>
+  `;
+  const list = document.getElementById('history-list');
+  list.insertBefore(block, list.firstChild);
+
+  const contentEl = block.querySelector('.block-content');
+
+  try {
+    const prompt = buildPrompt(idea, frameworks, role, intensity);
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: model,
+        prompt: prompt,
+        stream: true,
+        options: {
+          temperature: [0.5, 0.75, 1.0][intensity - 1],
+          num_predict: 800,
+          num_ctx: 4096
+        }
+      })
+    });
+
+    if (!response.ok) {
+      let errDetail = '';
+      try { const e = await response.json(); errDetail = e.error || ''; } catch {}
+      throw new Error(`HTTP ${response.status}${errDetail ? ': ' + errDetail : ''}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    contentEl.textContent = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split('\n').filter(Boolean);
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line);
+          if (data.response) {
+            fullText += data.response;
+            contentEl.innerHTML = renderMarkdown(fullText) + '<span class="cursor"></span>';
+            contentEl.scrollIntoView({ block: 'end', behavior: 'smooth' });
+          }
+          if (data.done) {
+            contentEl.innerHTML = renderMarkdown(fullText);
+          }
+          if (data.error) throw new Error(data.error);
+        } catch (parseErr) {
+          if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr;
+        }
+      }
+    }
+
+  } catch (err) {
+    const isCtx = err.message?.includes('context') || err.message?.includes('500');
+    contentEl.innerHTML = `<span style="color:var(--accent)">❌ ${err.message}</span>\n\n` +
+      (isCtx
+        ? `💡 วิธีแก้:\n• ลดจำนวน Framework ที่เลือก (เลือกแค่ 2-3 อัน)\n• หรือย่อไอเดียให้สั้นลง\n• หรือเปลี่ยน model เป็น llama3.1 / mistral`
+        : `ตรวจสอบ:\n• Ollama กำลังทำงานอยู่ไหม?\n• มี model "${model}" ติดตั้งแล้วไหม?\n• รัน: ollama pull ${model}`);
+  }
+
+  isRunning = false;
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('btn-text').textContent = 'ส่งไอเดียให้โจมตี';
+}
+
+// ═══ BASIC MARKDOWN RENDER ═══
+function renderMarkdown(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code style="font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px">$1</code>');
+}
+
+// ═══ KEYBOARD SHORTCUT ═══
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runAnalysis();
+});
+</script>
+</body>
+</html>
